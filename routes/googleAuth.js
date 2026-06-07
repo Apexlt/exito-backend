@@ -6,19 +6,20 @@ import qs from "querystring";
 
 const router = express.Router();
 
+const CLIENT_URL = process.env.CLIENT_URL; // frontend (Vercel)
+const SERVER_URL = process.env.SERVER_URL; // backend (Render)
+
 /* ===================== */
 /* STEP 1: REDIRECT */
 /* ===================== */
 router.get("/google", (req, res) => {
-  const {
-    GOOGLE_CLIENT_ID,
-  } = process.env;
+  const { GOOGLE_CLIENT_ID } = process.env;
 
   if (!GOOGLE_CLIENT_ID) {
     return res.status(500).send("Missing GOOGLE_CLIENT_ID");
   }
 
-  const redirect_uri = "http://localhost:5000/auth/google/callback";
+  const redirect_uri = `${SERVER_URL}/auth/google/callback`;
 
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
@@ -50,7 +51,7 @@ router.get("/google/callback", async (req, res) => {
     }
 
     const code = req.query.code;
-    if (!code) return res.redirect("http://localhost:5173/login");
+    if (!code) return res.redirect(`${CLIENT_URL}/login`);
 
     const tokenRes = await axios.post(
       "https://oauth2.googleapis.com/token",
@@ -58,7 +59,7 @@ router.get("/google/callback", async (req, res) => {
         code,
         client_id: GOOGLE_CLIENT_ID,
         client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: "http://localhost:5000/auth/google/callback",
+        redirect_uri: `${SERVER_URL}/auth/google/callback`,
         grant_type: "authorization_code",
       }),
       {
@@ -71,7 +72,7 @@ router.get("/google/callback", async (req, res) => {
     const { id_token } = tokenRes.data;
 
     if (!id_token) {
-      return res.redirect("http://localhost:5173/login");
+      return res.redirect(`${CLIENT_URL}/login`);
     }
 
     const payload = JSON.parse(
@@ -88,19 +89,16 @@ router.get("/google/callback", async (req, res) => {
       });
     }
 
-   const token = jwt.sign(
-  { id: user._id, email: user.email, role: user.role }, // ✅ ADD EMAIL
-  JWT_SECRET,
-  { expiresIn: "7d" }
-);
-
-    return res.redirect(
-      `http://localhost:5173/google-success?token=${token}`
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
     );
 
+    return res.redirect(`${CLIENT_URL}/google-success?token=${token}`);
   } catch (err) {
     console.error("GOOGLE ERROR:", err.message);
-    return res.redirect("http://localhost:5173/login");
+    return res.redirect(`${CLIENT_URL}/login`);
   }
 });
 
